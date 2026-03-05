@@ -205,8 +205,13 @@ function redrawAll() {
 // ---- Click ----
 canvas.addEventListener("click", e => {
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+
+  // Scale mouse position to internal canvas resolution
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top) * scaleY;
 
   let target;
 
@@ -295,3 +300,4 @@ fatherInput.addEventListener("change", () => {
 
 </body>
 </html>
+
