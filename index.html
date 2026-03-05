@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>DNA Strip Mixer</title>
+<title>DNA Mixer</title>
 
 <style>
   body {
@@ -31,6 +31,7 @@
     height: auto;
     background: black;
     cursor: pointer;
+    touch-action: manipulation;
   }
 
   .footer {
@@ -78,7 +79,7 @@
 <canvas id="canvas" width="600" height="600"></canvas>
 
 <div class="footer">
-  Click a region to toggle parent DNA.
+  Tap a region to toggle parent DNA.
 </div>
 
 <script>
@@ -100,6 +101,23 @@ let fatherImg = new Image();
 let cells = [];
 let count = 6;
 let mode = "horizontal";
+
+let imagesLoaded = 0;
+
+// ---- Default Images ----
+motherImg.src = "mother.jpg";
+fatherImg.src = "father.jpg";
+
+motherImg.onload = checkInitialLoad;
+fatherImg.onload = checkInitialLoad;
+
+function checkInitialLoad() {
+  imagesLoaded++;
+  if (imagesLoaded === 2) {
+    initializeCells();
+    redrawAll();
+  }
+}
 
 // ---- Cover Fit ----
 function getCoverFit(img) {
@@ -148,7 +166,7 @@ function initializeCells() {
   }
 }
 
-// ---- Draw One Cell ----
+// ---- Draw ----
 function drawCell(cell) {
   const source = cell.isMother ? motherImg : fatherImg;
   const fit = getCoverFit(source);
@@ -164,8 +182,8 @@ function drawCell(cell) {
       0, cell.index * h,
       canvas.width, h
     );
-
-  } else if (mode === "vertical") {
+  }
+  else if (mode === "vertical") {
     const w = canvas.width / count;
     const sWidth = fit.sWidth / count;
     const sx = fit.sx + cell.index * sWidth;
@@ -176,8 +194,8 @@ function drawCell(cell) {
       cell.index * w, 0,
       w, canvas.height
     );
-
-  } else {
+  }
+  else {
     const w = canvas.width / count;
     const h = canvas.height / count;
 
@@ -196,17 +214,15 @@ function drawCell(cell) {
   }
 }
 
-// ---- Redraw ----
 function redrawAll() {
-  if (!motherImg.src || !fatherImg.src) return;
+  if (!motherImg.complete || !fatherImg.complete) return;
   cells.forEach(drawCell);
 }
 
-// ---- Click ----
-canvas.addEventListener("click", e => {
+// ---- Pointer (Mobile Safe) ----
+canvas.addEventListener("pointerdown", e => {
   const rect = canvas.getBoundingClientRect();
 
-  // Scale mouse position to internal canvas resolution
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
 
@@ -217,13 +233,11 @@ canvas.addEventListener("click", e => {
 
   if (mode === "horizontal") {
     const h = canvas.height / count;
-    const i = Math.floor(y / h);
-    target = cells[i];
+    target = cells[Math.floor(y / h)];
   }
   else if (mode === "vertical") {
     const w = canvas.width / count;
-    const i = Math.floor(x / w);
-    target = cells[i];
+    target = cells[Math.floor(x / w)];
   }
   else {
     const w = canvas.width / count;
@@ -240,64 +254,51 @@ canvas.addEventListener("click", e => {
 });
 
 // ---- Controls ----
-randomizeBtn.addEventListener("click", () => {
+randomizeBtn.onclick = () => {
   cells.forEach(c => c.isMother = Math.random() > 0.5);
   redrawAll();
-});
+};
 
-resetMotherBtn.addEventListener("click", () => {
+resetMotherBtn.onclick = () => {
   cells.forEach(c => c.isMother = true);
   redrawAll();
-});
+};
 
-resetFatherBtn.addEventListener("click", () => {
+resetFatherBtn.onclick = () => {
   cells.forEach(c => c.isMother = false);
   redrawAll();
-});
+};
 
-stripCountInput.addEventListener("change", () => {
+stripCountInput.onchange = () => {
   initializeCells();
   redrawAll();
-});
+};
 
-modeSelect.addEventListener("change", () => {
+modeSelect.onchange = () => {
   mode = modeSelect.value;
   initializeCells();
   redrawAll();
-});
+};
 
-// ---- Image Load ----
-function loadImage(input, imgObj, callback) {
+// ---- Upload Override ----
+function loadImage(input, imgObj) {
   const file = input.files[0];
   if (!file) return;
 
   const reader = new FileReader();
   reader.onload = e => {
-    imgObj.onload = callback;
+    imgObj.onload = () => {
+      initializeCells();
+      redrawAll();
+    };
     imgObj.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
-motherInput.addEventListener("change", () => {
-  loadImage(motherInput, motherImg, () => {
-    if (fatherImg.src) {
-      initializeCells();
-      redrawAll();
-    }
-  });
-});
-
-fatherInput.addEventListener("change", () => {
-  loadImage(fatherInput, fatherImg, () => {
-    if (motherImg.src) {
-      initializeCells();
-      redrawAll();
-    }
-  });
-});
+motherInput.onchange = () => loadImage(motherInput, motherImg);
+fatherInput.onchange = () => loadImage(fatherInput, fatherImg);
 </script>
 
 </body>
 </html>
-
