@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Genetic Tile Mixer</title>
+<title>DNA Strip Mixer</title>
 
 <style>
   body {
@@ -15,15 +15,11 @@
     padding: 20px;
   }
 
-  h1 {
-    margin-bottom: 10px;
-  }
+  h1 { margin-bottom: 10px; }
 
-  .controls {
-    margin-bottom: 20px;
-  }
+  .controls { margin-bottom: 20px; }
 
-  input, button {
+  input, button, select {
     margin: 5px;
     padding: 8px 12px;
     font-size: 14px;
@@ -47,28 +43,42 @@
 
 <body>
 
-<h1>Genetic Tile Mixer</h1>
+<h1>DNA Mixer</h1>
 
 <div class="controls">
   <label>Mother:
     <input type="file" id="motherInput" accept="image/*">
   </label>
+
   <label>Father:
     <input type="file" id="fatherInput" accept="image/*">
   </label>
+
   <br>
-  <label>Grid Size:
-    <input type="number" id="gridSize" value="6" min="2" max="20">
+
+  <label>Strips:
+    <input type="number" id="stripCount" value="6" min="2" max="40">
   </label>
+
+  <label>Mode:
+    <select id="modeSelect">
+      <option value="horizontal">Horizontal</option>
+      <option value="vertical">Vertical</option>
+      <option value="both">Both (Grid)</option>
+    </select>
+  </label>
+
+  <br>
+
   <button id="randomizeBtn">Randomize</button>
   <button id="resetMotherBtn">All Mother</button>
   <button id="resetFatherBtn">All Father</button>
 </div>
 
-<canvas id="canvas" width="500" height="500"></canvas>
+<canvas id="canvas" width="600" height="600"></canvas>
 
 <div class="footer">
-  Click tiles to toggle DNA. You monsters.
+  Click a region to toggle parent DNA.
 </div>
 
 <script>
@@ -77,7 +87,8 @@ const ctx = canvas.getContext("2d");
 
 const motherInput = document.getElementById("motherInput");
 const fatherInput = document.getElementById("fatherInput");
-const gridSizeInput = document.getElementById("gridSize");
+const stripCountInput = document.getElementById("stripCount");
+const modeSelect = document.getElementById("modeSelect");
 
 const randomizeBtn = document.getElementById("randomizeBtn");
 const resetMotherBtn = document.getElementById("resetMotherBtn");
@@ -86,13 +97,171 @@ const resetFatherBtn = document.getElementById("resetFatherBtn");
 let motherImg = new Image();
 let fatherImg = new Image();
 
-let tiles = [];
-let rows = 6;
-let cols = 6;
+let cells = [];
+let count = 6;
+let mode = "horizontal";
 
-let tileWidth;
-let tileHeight;
+// ---- Cover Fit ----
+function getCoverFit(img) {
+  const canvasRatio = canvas.width / canvas.height;
+  const imgRatio = img.width / img.height;
 
+  let sx, sy, sWidth, sHeight;
+
+  if (imgRatio > canvasRatio) {
+    sHeight = img.height;
+    sWidth = img.height * canvasRatio;
+    sx = (img.width - sWidth) / 2;
+    sy = 0;
+  } else {
+    sWidth = img.width;
+    sHeight = img.width / canvasRatio;
+    sx = 0;
+    sy = (img.height - sHeight) / 2;
+  }
+
+  return { sx, sy, sWidth, sHeight };
+}
+
+// ---- Initialize ----
+function initializeCells() {
+  count = parseInt(stripCountInput.value);
+  cells = [];
+
+  if (mode === "both") {
+    for (let r = 0; r < count; r++) {
+      for (let c = 0; c < count; c++) {
+        cells.push({
+          row: r,
+          col: c,
+          isMother: Math.random() > 0.5
+        });
+      }
+    }
+  } else {
+    for (let i = 0; i < count; i++) {
+      cells.push({
+        index: i,
+        isMother: Math.random() > 0.5
+      });
+    }
+  }
+}
+
+// ---- Draw One Cell ----
+function drawCell(cell) {
+  const source = cell.isMother ? motherImg : fatherImg;
+  const fit = getCoverFit(source);
+
+  if (mode === "horizontal") {
+    const h = canvas.height / count;
+    const sHeight = fit.sHeight / count;
+    const sy = fit.sy + cell.index * sHeight;
+
+    ctx.drawImage(source,
+      fit.sx, sy,
+      fit.sWidth, sHeight,
+      0, cell.index * h,
+      canvas.width, h
+    );
+
+  } else if (mode === "vertical") {
+    const w = canvas.width / count;
+    const sWidth = fit.sWidth / count;
+    const sx = fit.sx + cell.index * sWidth;
+
+    ctx.drawImage(source,
+      sx, fit.sy,
+      sWidth, fit.sHeight,
+      cell.index * w, 0,
+      w, canvas.height
+    );
+
+  } else {
+    const w = canvas.width / count;
+    const h = canvas.height / count;
+
+    const sWidth = fit.sWidth / count;
+    const sHeight = fit.sHeight / count;
+
+    const sx = fit.sx + cell.col * sWidth;
+    const sy = fit.sy + cell.row * sHeight;
+
+    ctx.drawImage(source,
+      sx, sy,
+      sWidth, sHeight,
+      cell.col * w, cell.row * h,
+      w, h
+    );
+  }
+}
+
+// ---- Redraw ----
+function redrawAll() {
+  if (!motherImg.src || !fatherImg.src) return;
+  cells.forEach(drawCell);
+}
+
+// ---- Click ----
+canvas.addEventListener("click", e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  let target;
+
+  if (mode === "horizontal") {
+    const h = canvas.height / count;
+    const i = Math.floor(y / h);
+    target = cells[i];
+  }
+  else if (mode === "vertical") {
+    const w = canvas.width / count;
+    const i = Math.floor(x / w);
+    target = cells[i];
+  }
+  else {
+    const w = canvas.width / count;
+    const h = canvas.height / count;
+    const col = Math.floor(x / w);
+    const row = Math.floor(y / h);
+    target = cells.find(c => c.row === row && c.col === col);
+  }
+
+  if (!target) return;
+
+  target.isMother = !target.isMother;
+  drawCell(target);
+});
+
+// ---- Controls ----
+randomizeBtn.addEventListener("click", () => {
+  cells.forEach(c => c.isMother = Math.random() > 0.5);
+  redrawAll();
+});
+
+resetMotherBtn.addEventListener("click", () => {
+  cells.forEach(c => c.isMother = true);
+  redrawAll();
+});
+
+resetFatherBtn.addEventListener("click", () => {
+  cells.forEach(c => c.isMother = false);
+  redrawAll();
+});
+
+stripCountInput.addEventListener("change", () => {
+  initializeCells();
+  redrawAll();
+});
+
+modeSelect.addEventListener("change", () => {
+  mode = modeSelect.value;
+  initializeCells();
+  redrawAll();
+});
+
+// ---- Image Load ----
 function loadImage(input, imgObj, callback) {
   const file = input.files[0];
   if (!file) return;
@@ -105,89 +274,10 @@ function loadImage(input, imgObj, callback) {
   reader.readAsDataURL(file);
 }
 
-function initializeTiles() {
-  rows = parseInt(gridSizeInput.value);
-  cols = rows;
-
-  tileWidth = canvas.width / cols;
-  tileHeight = canvas.height / rows;
-
-  tiles = [];
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      tiles.push({
-        row: r,
-        col: c,
-        isMother: Math.random() > 0.5
-      });
-    }
-  }
-}
-
-function drawTile(tile) {
-  const source = tile.isMother ? motherImg : fatherImg;
-
-  const sx = tile.col * tileWidth;
-  const sy = tile.row * tileHeight;
-
-  ctx.drawImage(
-    source,
-    sx, sy,
-    tileWidth, tileHeight,
-    sx, sy,
-    tileWidth, tileHeight
-  );
-}
-
-function redrawAll() {
-  if (!motherImg.src || !fatherImg.src) return;
-  tiles.forEach(drawTile);
-}
-
-function toggleTile(row, col) {
-  const tile = tiles.find(t => t.row === row && t.col === col);
-  if (!tile) return;
-
-  tile.isMother = !tile.isMother;
-  drawTile(tile);
-}
-
-canvas.addEventListener("click", e => {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  const col = Math.floor(x / tileWidth);
-  const row = Math.floor(y / tileHeight);
-
-  toggleTile(row, col);
-});
-
-randomizeBtn.addEventListener("click", () => {
-  tiles.forEach(tile => tile.isMother = Math.random() > 0.5);
-  redrawAll();
-});
-
-resetMotherBtn.addEventListener("click", () => {
-  tiles.forEach(tile => tile.isMother = true);
-  redrawAll();
-});
-
-resetFatherBtn.addEventListener("click", () => {
-  tiles.forEach(tile => tile.isMother = false);
-  redrawAll();
-});
-
-gridSizeInput.addEventListener("change", () => {
-  initializeTiles();
-  redrawAll();
-});
-
 motherInput.addEventListener("change", () => {
   loadImage(motherInput, motherImg, () => {
     if (fatherImg.src) {
-      initializeTiles();
+      initializeCells();
       redrawAll();
     }
   });
@@ -196,7 +286,7 @@ motherInput.addEventListener("change", () => {
 fatherInput.addEventListener("change", () => {
   loadImage(fatherInput, fatherImg, () => {
     if (motherImg.src) {
-      initializeTiles();
+      initializeCells();
       redrawAll();
     }
   });
